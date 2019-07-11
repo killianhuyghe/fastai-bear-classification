@@ -1,1 +1,1 @@
-# Bear classification web app following fastai course
+A bear classification web app following fastai course
