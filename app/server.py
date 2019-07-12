@@ -12,6 +12,7 @@ model_file_url = 'https://drive.google.com/uc?export=download&id=1-QiwCdahNLenZW
 model_file_name = 'export.pkl'
 classes = ['black', 'teddy', 'grizzly']
 path = Path(__file__).parent
+model_path = path/'models'
 
 app = Starlette()
 app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_headers=['X-Requested-With', 'Content-Type'])
@@ -25,11 +26,8 @@ async def download_file(url, dest):
             with open(dest, 'wb') as f: f.write(data)
 
 async def setup_learner():
-    await download_file(model_file_url, path/'models'/f'{model_file_name}.pth')
-    data_bunch = ImageDataBunch.single_from_classes(path, classes,
-        tfms=get_transforms(), size=224).normalize(imagenet_stats)
-    learn = cnn_learner(data_bunch, models.resnet34, pretrained=False)
-    learn.load(model_file_name)
+    await download_file(model_file_url, model_path/model_file_name)
+    learn = load_learner(model_path, model_file_name)
     return learn
 
 loop = asyncio.get_event_loop()
@@ -47,7 +45,10 @@ async def analyze(request):
     data = await request.form()
     img_bytes = await (data['file'].read())
     img = open_image(BytesIO(img_bytes))
-    return JSONResponse({'result': learn.predict(img)[0]})
+    prediction, _, values = learn.predict(img)
+    label = str(prediction)
+    accuracy = values[int(prediction)].item()
+    return JSONResponse({'result': label + ' ({:05.2f}%)'.format(accuracy * 100)})
 
 if __name__ == '__main__':
     if 'serve' in sys.argv: uvicorn.run(app, host='0.0.0.0', port=8080)
